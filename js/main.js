@@ -1,32 +1,53 @@
 // define
 var SCREEN_WIDTH = window.innerWidth;
 var SCREEN_HEIGHT = window.innerHeight;
-var PIC_SIZE = 16;
+var PIC_SIZE = 32;
+var BLANK_NUM = 3;
+var Y_VELO = 10;
+var SPEED = 8;
+var SPRITE_X = 32;
+var SPRITE_Y = 64;
+var SPRITE_POS = SCREEN_HEIGHT / 4 * 3 - SPRITE_Y + 16;
 // function
-var createCrashSprite = function(x, y){
-	var sprite = tm.app.AnimationSprite(96, 128, ss);
+var createAnimationSprite = function(x, y, ss){
+	var sprite = tm.app.AnimationSprite(ss, SPRITE_X, SPRITE_Y);
 	sprite.position.set(x, y);
 	sprite.gotoAndPlay("run");
-	sprite.blendMode = "lighter";
 
 	return sprite;
 };
+var ss_run = tm.asset.SpriteSheet({
+	image: "pic/sprite_run.png",
+	frame: {
+		width: SPRITE_X,
+		height: SPRITE_Y,
+		count: 8
+	},
+	animations: {
+		"run": [0, 6, "run", 3],
+		"jump": {
+			frames: [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+			next: "run",
+			frequency: 1,
+		},
+	}
+});
+var ss_down = tm.asset.SpriteSheet({
+	image: "pic/sprite_down.png",
+	frame: {
+		width: 64,
+		height: 32,
+		count: 2
+	},
+	animations: {
+		"down": [0, 2, "down", 1000],
+	}
+});
 // img
 var ASSETS = {
 	"ground": "pic/grd.png",
 	"hardle": "pic/hardle.png"
 };
-var ss = tm.app.SpriteSheet({
-	image: "pic/run.png",
-	frame: {
-		width: 32,
-		height: 64,
-		count: 6
-	},
-	animations: {
-		"run": [0, 5, "run"],
-	}
-});
 // textLabel
 var UI_DATA = {
 	main: {
@@ -93,13 +114,15 @@ tm.define("gameScene", {
 		this.hardleGroup = tm.app.CanvasElement().addChildTo(this);
 		this.grdGroup = tm.app.CanvasElement().addChildTo(this);
 		this.interval = Math.rand(10, 100);
-		var animationSprite = createAnimationSprite(100, SCREEN_HEIGHT /4 * 3 - 64);
-		this.addChild(animationSprite);
+		this.animationSprite = createAnimationSprite(100, SPRITE_POS, ss_run);
+		this.addChild(this.animationSprite);
+		this.jump_v = Y_VELO;
+		this.jump_flag = false;
 
 		this.posX = 0;
 		this.posY = SCREEN_HEIGHT / 4 * 3;
-		for(var y = this.posY; this.posY <= (SCREEN_HEIGHT + (PIC_SIZE * 3)); this.posY += PIC_SIZE){
-			for(var x = this.posX; this.posX <= (SCREEN_WIDTH + (PIC_SIZE * 3)); this.posX += PIC_SIZE){
+		for(var y = this.posY; this.posY <= SCREEN_HEIGHT; this.posY += PIC_SIZE){
+			for(var x = this.posX; this.posX <= (SCREEN_WIDTH + (PIC_SIZE * BLANK_NUM)); this.posX += PIC_SIZE){
 				this.setSprite("ground", PIC_SIZE, PIC_SIZE, this.posX, this.posY, this.grdGroup);
 			}
 			this.posX = 0;
@@ -110,17 +133,42 @@ tm.define("gameScene", {
 
 	update: function(app){
 		var time = ((app.frame / app.fps) * 1000) | 0;
-		var timeStr = "" + this.interval + " : " + app.frame;//"Score : " + time + "";
+		var timeStr = "Score : " + ((time / 100) | 0) + "";
+		var key = this.app.keyboard;
+
+		if(key.getKey("z")){
+			if(this.jump_flag == false){
+				this.animationSprite.gotoAndPlay("jump");
+			}
+			this.jump_flag = true;
+		}
+		
+		if(this.jump_flag){
+			this.animationSprite.y -= this.jump_v;
+			this.jump_v--;
+			if(this.animationSprite.y >= SPRITE_POS){
+				this.animationSprite.y = SPRITE_POS;
+				this.jump_v = Y_VELO;
+				this.jump_flag = false;
+			}
+		}
 
 		if(app.frame >= this.interval){
-			this.posX = SCREEN_WIDTH + (PIC_SIZE * 2);
+			this.posX = SCREEN_WIDTH + (PIC_SIZE * BLANK_NUM);
 			this.posY = (SCREEN_HEIGHT / 4 * 3) - PIC_SIZE;
 			this.setSprite("hardle", PIC_SIZE, PIC_SIZE, this.posX, this.posY, this.hardleGroup);
-			this.setInterval(100, 200, app);
+			this.setInterval(10, 100, app);
 		}
 
 		this.hardleGroup.children.each( function(i){
-			i.x -= 3;
+			i.x -= SPEED;
+		});
+		
+		this.grdGroup.children.each( function(i){
+			i.x -= SPEED;
+			if(i.x <= -PIC_SIZE){
+				i.x = SCREEN_WIDTH + (PIC_SIZE * (BLANK_NUM - 1));
+			}
 		});
 
 		this.mainLabel.text = timeStr;
